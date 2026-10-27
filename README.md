@@ -22,14 +22,14 @@ watchlist.md  ──►  Claude researches  ──►  intel.py dedupes & valida
 **As a Claude Code plugin** (once this repo is on GitHub):
 
 ```
-/plugin marketplace add <github-user>/competitor-intel-skill
+/plugin marketplace add markc0909/competitor-intel-skill
 /plugin install competitor-intel@competitor-intel
 ```
 
 **As a personal skill** (copies to `~/.claude/skills/competitor-intel`):
 
 ```bash
-git clone https://github.com/<github-user>/competitor-intel-skill.git && ./competitor-intel-skill/install.sh
+git clone https://github.com/markc0909/competitor-intel-skill.git && ./competitor-intel-skill/install.sh
 ```
 
 **Claude.ai / Claude desktop (chat)**: zip `skills/competitor-intel/` and upload it under Settings → Capabilities → Skills. Chat sandboxes may not keep files between conversations, so for scheduled runs with persistent state, use Claude Code (desktop app, CLI, or a cloud routine backed by a git repo).
