@@ -1,0 +1,8 @@
+{
+  "name": "competitor-intel",
+  "version": "1.0.0",
+  "description": "Scheduled competitor monitoring from a plain-Markdown watchlist: cited, deduplicated, tiered intelligence digests.",
+  "author": { "name": "Mark Cohen" },
+  "license": "MIT",
+  "keywords": ["competitors", "market-intelligence", "monitoring", "digest", "scheduled"]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "competitor-intel",
+  "owner": { "name": "Mark Cohen" },
+  "plugins": [
+    {
+      "name": "competitor-intel",
+      "source": "./",
+      "description": "Scheduled competitor monitoring from a plain-Markdown watchlist."
+    }
+  ]
+}

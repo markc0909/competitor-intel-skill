@@ -1,0 +1,51 @@
+{
+  "watch": "acme",
+  "generated_at": "2026-10-28T07:00:00Z",
+  "window": { "since": "2026-10-19T07:00:00Z", "until": "2026-10-28T07:00:00Z" },
+  "summary": "SYNTHETIC FIXTURE — not real intelligence. One funding event and one product launch; listicle noise suppressed.",
+  "items": [
+    {
+      "event_key": "payco-series-c-2026",
+      "tier": 1,
+      "category": "funding",
+      "competitor": "PayCo",
+      "our_products": ["Acme Pay"],
+      "headline": "PayCo raises $80M Series C to expand embedded payments",
+      "what_changed": "PayCo announced an $80M Series C led by Example Ventures on 22 Oct 2026, earmarked for platform partnerships.",
+      "why_it_matters": "Expect PayCo to outbid Acme Pay on partner revenue share over the next two quarters.",
+      "published_at": "2026-10-22",
+      "confidence": "high",
+      "source": {
+        "title": "PayCo announces Series C",
+        "publisher": "PayCo Newsroom",
+        "url": "https://www.payco.example/news/series-c?utm_source=newsletter"
+      },
+      "corroboration": [
+        { "title": "PayCo lands $80M", "publisher": "Fintech Daily", "url": "https://fintechdaily.example/payco-80m" }
+      ],
+      "follow_up": "Ask partnerships for PayCo's current rev-share terms."
+    },
+    {
+      "event_key": "rival-books-ai-close-launch",
+      "tier": 2,
+      "category": "product",
+      "competitor": "Rival Books",
+      "our_products": ["Acme Ledger"],
+      "headline": "Rival Books ships AI month-end close assistant",
+      "what_changed": "Rival Books released an AI assistant that drafts reconciliations and close checklists, available on its Cloud tier.",
+      "why_it_matters": "Directly targets Acme Ledger's close-automation differentiator in mid-market deals.",
+      "published_at": "2026-10-24T14:00:00Z",
+      "confidence": "medium",
+      "source": {
+        "title": "Introducing Close Assistant",
+        "publisher": "Rival Books Blog",
+        "url": "https://rivalbooks.example/blog/close-assistant/"
+      }
+    }
+  ],
+  "suppressed": { "tier3_by_competitor": { "Rival Books": 4, "PayCo": 1 } },
+  "coverage_gaps": [],
+  "suggestions": [
+    { "type": "competitor", "value": "LedgerLite", "reason": "Appeared in 3 market-watch results as a mid-market entrant" }
+  ]
+}

@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.DS_Store
+# never commit real watch data to the public skill repo
+.competitor-intel/
