@@ -47,7 +47,18 @@ Read `references/watchlist-format.md` before editing a watchlist by hand. Read `
 
 1. Run `INTEL list`. If a watch already exists, confirm whether the user wants another one.
 2. Ask for, or infer from what the user has shared: company name, our products (with a one-line description each), known competitors and which of our products each one competes with, and any must-exclude terms (always include our own brand and domain). Don't make the user fill in a form. A short paragraph from them is enough to draft a watchlist.
-3. Run `INTEL init --watch <slug> --company "<Name>"` to create the folder from the template, then replace the example products and competitors in `watchlist.md` with the user's. For each competitor, draft 2–4 keywords: the exact brand in quotes, product names, and the domain. Quote any phrase that must match exactly.
+3. Run `INTEL init --watch <slug> --company "<Name>"` to create the folder from the template, then replace the example content in `watchlist.md` with the user's. Model it **per product**: one `#### vs <Competitor>` matchup for each real rival, with `type`, `role`, a one-line `how`, and 2–4 product-specific `keywords`. Put brand-wide facts (domain, `parent`, `ambiguous`/`verify`, brand keywords) once, under `## Competitors`. Quote any phrase that must match exactly.
+
+   **Importing an existing competitor map** (a doc, spreadsheet, or deck): read the whole thing, then map it as follows.
+   - Each product section becomes a `### product`, carrying over its notes on lifecycle (end of life, so `lifecycle: sunsetting`), priority (legacy or lower priority, so `priority: low`), and sibling products we own (`siblings`).
+   - Each competitor row under a product becomes a `#### vs` matchup. The competition-type column becomes `type` plus `role`, the "how they compete" text becomes `how`, the "watch for" notes on adjacent rows become `watch_for`, and the row's keywords become matchup `keywords`.
+   - Rows marked internal or "not a competitor" become `type: internal`, or `siblings`.
+   - Combined rows such as "A / B" or "X, Y and Z native payments" get split into one matchup per company.
+   - Ownership the map mentions ("X-owned", "now part of", "backed by") becomes a `parent`.
+   - Name-collision warnings become `ambiguous: yes` with a `verify` note.
+   - Standing, cross-product items such as mergers and roll-ups become `## Group Watches`.
+
+   Never carry the map's competitive claims over as facts. They become `how` context only.
 4. Run `INTEL config --plan`. Fix every error. Show the user the products, the competitors, and a handful of sample queries, then ask them to confirm.
 5. Run `INTEL log "Initial watchlist created"`.
 6. Offer one manual run now, and then scheduling. Don't create a schedule until the user picks a cadence and where results should go.
@@ -60,11 +71,19 @@ Follow these steps in order. In a scheduled or unattended run, ask no questions.
 
 ### 1. Load the plan
 
-Run `INTEL config --plan`. If it exits non-zero, stop and report the errors: a broken watchlist must never produce a digest. The output gives you the active products, the active competitors, the exclusions, a `window.since_by_watch` date for each competitor (it already includes overlap for late indexing, and it keeps a failed competitor's old cutoff), and a starting list of `queries`.
+Run `INTEL config --plan`. If it exits non-zero, stop and report the errors: a broken watchlist must never produce a digest. The output gives you:
+
+- the products, each with its matchups (`type`, `role`, `how`, `watch_for`)
+- the competitor entities, with `affects` (which of our products each one touches, including through brands it owns) and `parent`
+- the group watches, the exclusions, and the internal names
+- a `window.since_by_watch` date for each competitor, group watch, and market watch. This already includes overlap for late indexing, and it keeps a failed watch's old cutoff.
+- a starting list of `queries`. Each query is tagged with its `watch` key, the `products` it serves, the `matchups` it came from, and, for ambiguous names, a `verify` note.
 
 ### 2. Collect evidence
 
-Use whatever web search and fetch tools you have. For each active competitor, run its planned queries, restricted to results after its `since` date where the tool supports it. Run the market watch queries (`watch: "_market"`) once each. You may add your own focused queries, such as `"<brand>" press release`, `"<brand>" acquires`, or `"<brand>" pricing`. Open the promising results. Don't classify from snippets alone.
+Use whatever web search and fetch tools you have. Run every planned query, restricted to results after its `since` date where the tool supports it. Group watch queries (`_group:<name>`) and market watch queries (`_market`) run once per run, not once per product. You may add your own focused queries, such as `"<brand>" press release`, `"<brand>" acquires`, or `"<brand>" pricing`. Open the promising results. Don't classify from snippets alone.
+
+If a query has a `verify` note, confirm that each result is about the right company (by domain, product, or market) before keeping it. Name collisions are the most common false positive. Results about our own products, or about sibling products we own (`internal_names`), are never competitor news, even when a competitor's query brings them up.
 
 Source priority:
 
@@ -84,12 +103,14 @@ Many articles about one deal count as **one** event. Merge syndicated copies, re
 
 ### 4. Classify, then write
 
-Classify every event with a tier, a category, and a confidence level **before** writing any prose. Use `references/classification.md`. Tier 3 events are never items. Count them per competitor in `suppressed.tier3_by_competitor`. If an event is borderline, suppress it.
+Classify every event with a tier, a category, and a confidence level **before** writing any prose. Use `references/classification.md`. The classification has to use the map: the matchup `type` and `watch_for`, the product `lifecycle` and `priority`, the competitor's `parent`, and the group watches. Tier 3 events are never items. Count them per competitor in `suppressed.tier3_by_competitor`. If an event is borderline, suppress it.
 
 Then write each Tier 1 and Tier 2 item:
 
+- `our_products`: every product of ours that's affected, with the most-affected first. When the news is about a parent group, include the products of every brand under it.
 - `what_changed`: plain facts only, attributable to the source.
-- `why_it_matters`: the specific implication for the named product(s) of ours. If you can't name one, the item doesn't belong in the digest.
+- `why_it_matters`: the specific implication for the named product(s), argued from the matchup's `how` angle. If you can't name one, the item doesn't belong in the digest.
+- `group_watch`: the group watch name, if the item came from one.
 - `follow_up` (optional): one concrete next action.
 
 Keep at most `max_items` items. Rank them by tier, then by number of our products affected, then confidence, then recency. Excess Tier 2 items go to the suppressed counts. Never pad a quiet week.
@@ -135,10 +156,11 @@ Finish with a short summary: the number of items, the top headline, any coverage
 The user changes what gets monitored by asking in plain language. For every change:
 
 1. Read `watchlist.md` and make the smallest edit that does the job, using the format in `references/watchlist-format.md`.
-   - **Add a competitor**: create a `### Name` entry with `status`, `competes_with` (exact names of our products), `keywords`, and if known `domain` and `exclude`. Propose keywords if the user didn't give any.
-   - **Remove a competitor**: prefer `status: paused`, which keeps the history and any later reactivation clean. Delete the entry only if the user says delete.
-   - **Add or remove search terms**: edit that competitor's `keywords` or `exclude`, or the `## Market Watches` or `## Global Exclusions` bullets.
-   - **Add, rename, or pause a product**: update `## Our Products`. If you rename a product, also update every `competes_with` that refers to it.
+   - **Add a competitor to a product**: add a `#### vs Name` matchup under that product, with `type`, `role`, `how`, and product-specific `keywords`. If the brand is new, also add a `### Name` entry under Competitors with `domain`, brand `keywords`, and if relevant `parent` and `ambiguous`/`verify`. Propose keywords and a `how` line if the user didn't give them, and confirm the `how` line with them.
+   - **Remove a competitor**: to stop watching a brand everywhere, set `status: paused` on its Competitors entry. To drop it from one product only, delete that one matchup. Delete a brand's entry outright only if the user says delete.
+   - **Add or remove search terms**: edit the keywords on the right level. Put product-specific terms on the matchup, brand-wide terms on the Competitors entry, cross-product themes on a Group Watch, and category terms under Market Watches. Put SEO noise under `## Noise Terms`, and our own brand under `## Global Exclusions`.
+   - **Ownership changes or mergers** ("X acquired Y", "A and B are merging"): set `parent` on the acquired brand, and add or update a `## Group Watches` entry with `affects` and `keywords`.
+   - **Add, rename, sunset, or pause a product**: update `## Our Products`. For end of life, set `lifecycle: sunsetting` and add migration or "switch from" keywords to its matchups. If you rename a product, also update every matchup, `competes_with`, and `affects` that refers to it.
    - **Change cadence, item cap, or delivery**: edit `## Settings`. If a schedule exists, update it to match.
 2. Run `INTEL config` and fix anything you broke.
 3. Run `INTEL log "<what changed and why>"`.

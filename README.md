@@ -10,7 +10,8 @@ watchlist.md  ──►  Claude researches  ──►  intel.py dedupes & valida
 
 ## What you get
 
-- **A Markdown watchlist** (`watchlist.md`) with your products, your competitors, which product each competitor threatens, search keywords, market-wide watch terms, exclusions, and delivery settings.
+- **A Markdown watchlist** (`watchlist.md`) organised the way competitive maps are written: per product, each real rival as a `#### vs` matchup with a competition type (direct / adjacent / internal), the angle they compete on, and product-specific search terms. Brand-level facts (domain, parent group, name-collision warnings) are written once. Group watches track consolidation moves that can shift several products at once. There are also market-wide watch terms, noise terms, exclusions, and delivery settings.
+- **Import an existing competitor map.** Hand Claude a doc or spreadsheet that maps competitors to products and it converts it into a watchlist: rows become matchups, ownership notes become parents, and merger notes become group watches.
 - **Prompt-driven upkeep.** Say "add LedgerLite as a competitor to Acme Ledger" or "stop tracking the term 'embedded finance'". Claude edits the file, validates it, and writes a line to the change log.
 - **Noise control.** Tier 1 (funding, M&A, leadership, regulatory), Tier 2 (launches, partnerships, pricing), and Tier 3 (listicles and SEO noise, which are only counted). Ten articles about one deal count as one event.
 - **Memory between runs.** `state.json` remembers what was already reported (by semantic fingerprint and canonical URL) and a cutoff for each competitor. A failed search never silently skips a week, and a re-run never alerts twice.

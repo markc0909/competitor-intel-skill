@@ -1,15 +1,20 @@
 {
   "watch": "acme",
   "generated_at": "2026-10-28T07:00:00Z",
-  "window": { "since": "2026-10-19T07:00:00Z", "until": "2026-10-28T07:00:00Z" },
-  "summary": "SYNTHETIC FIXTURE — not real intelligence. One funding event and one product launch; listicle noise suppressed.",
+  "window": {
+    "since": "2026-10-19T07:00:00Z",
+    "until": "2026-10-28T07:00:00Z"
+  },
+  "summary": "SYNTHETIC FIXTURE — not real intelligence. A roll-up deal touching two products, a funding round, and a product launch; listicle noise suppressed.",
   "items": [
     {
       "event_key": "payco-series-c-2026",
       "tier": 1,
       "category": "funding",
       "competitor": "PayCo",
-      "our_products": ["Acme Pay"],
+      "our_products": [
+        "Acme Pay"
+      ],
       "headline": "PayCo raises $80M Series C to expand embedded payments",
       "what_changed": "PayCo announced an $80M Series C led by Example Ventures on 22 Oct 2026, earmarked for platform partnerships.",
       "why_it_matters": "Expect PayCo to outbid Acme Pay on partner revenue share over the next two quarters.",
@@ -21,7 +26,11 @@
         "url": "https://www.payco.example/news/series-c?utm_source=newsletter"
       },
       "corroboration": [
-        { "title": "PayCo lands $80M", "publisher": "Fintech Daily", "url": "https://fintechdaily.example/payco-80m" }
+        {
+          "title": "PayCo lands $80M",
+          "publisher": "Fintech Daily",
+          "url": "https://fintechdaily.example/payco-80m"
+        }
       ],
       "follow_up": "Ask partnerships for PayCo's current rev-share terms."
     },
@@ -30,7 +39,9 @@
       "tier": 2,
       "category": "product",
       "competitor": "Rival Books",
-      "our_products": ["Acme Ledger"],
+      "our_products": [
+        "Acme Ledger"
+      ],
       "headline": "Rival Books ships AI month-end close assistant",
       "what_changed": "Rival Books released an AI assistant that drafts reconciliations and close checklists, available on its Cloud tier.",
       "why_it_matters": "Directly targets Acme Ledger's close-automation differentiator in mid-market deals.",
@@ -41,11 +52,42 @@
         "publisher": "Rival Books Blog",
         "url": "https://rivalbooks.example/blog/close-assistant/"
       }
+    },
+    {
+      "event_key": "rival-group-acquires-ledgerlite",
+      "group_watch": "Rival Group roll-up",
+      "tier": 1,
+      "category": "m&a",
+      "competitor": "Rival Group",
+      "our_products": [
+        "Acme Classic",
+        "Acme Ledger"
+      ],
+      "headline": "Rival Group acquires LedgerLite to bundle with Rival Books",
+      "what_changed": "Rival Group announced it has agreed to acquire LedgerLite; the products will be sold as one suite from Q1 2027.",
+      "why_it_matters": "Gives Rival Books a low-cost entry tier to pitch at Acme Classic customers during the sunset window, and widens the bundle Acme Ledger competes against.",
+      "published_at": "2026-10-26",
+      "confidence": "high",
+      "source": {
+        "title": "Rival Group to acquire LedgerLite",
+        "publisher": "Rival Group Investor Relations",
+        "url": "https://rivalgroup.example/ir/ledgerlite"
+      },
+      "follow_up": "Brief Acme Classic account managers on retention offers this week."
     }
   ],
-  "suppressed": { "tier3_by_competitor": { "Rival Books": 4, "PayCo": 1 } },
+  "suppressed": {
+    "tier3_by_competitor": {
+      "Rival Books": 4,
+      "PayCo": 1
+    }
+  },
   "coverage_gaps": [],
   "suggestions": [
-    { "type": "competitor", "value": "LedgerLite", "reason": "Appeared in 3 market-watch results as a mid-market entrant" }
+    {
+      "type": "competitor",
+      "value": "LedgerLite",
+      "reason": "Now part of Rival Group; add as a brand with parent: Rival Group"
+    }
   ]
 }

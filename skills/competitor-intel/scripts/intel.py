@@ -40,17 +40,22 @@ CATEGORIES = {
 CONFIDENCE = {"high", "medium", "low"}
 LIST_FIELDS = {
     "aliases", "markets", "competes_with", "products", "keywords", "exclude",
-    "outputs",
+    "outputs", "siblings", "affects", "competitors",
 }
+MATCHUP_TYPES = {"direct": 0, "adjacent": 1, "internal": 9}
+PRIORITY = {"high": 0, "normal": 1, "low": 2}
 INT_SETTINGS = {
     "lookback_days": 7, "overlap_days": 2, "max_items": 8, "seen_window_days": 90,
 }
 DEFAULT_SETTINGS = {
     "cadence": "weekly", "timezone": "UTC", "outputs": ["markdown", "html", "chat"],
-    "quiet_runs": "note", "deliver_to": "local", **INT_SETTINGS,
+    "quiet_runs": "note", "deliver_to": "local", "group_by": "tier", **INT_SETTINGS,
 }
-BULLET_SECTIONS = {"market watches", "global exclusions", "suggestions", "change log"}
+ENTRY_SECTIONS = {"our products", "competitors", "group watches"}
+BULLET_SECTIONS = {"market watches", "noise terms", "global exclusions", "suggestions", "change log"}
 MARKET_KEY = "_market"
+GROUP_PREFIX = "_group:"
+MAX_NEGATIVES = 6
 TRACKING_PARAMS = re.compile(r"^(utm_.*|fbclid|gclid|mc_cid|mc_eid|ref|ref_src|cmpid|ocid)$", re.I)
 CHAT_LIMIT = 3000
 
@@ -176,20 +181,29 @@ def unquote(term: str) -> str:
 
 
 def parse_watchlist(path: Path) -> dict:
+    """Sections (##) hold fields, entries (###) or bullets. Product entries may hold
+    matchups (#### vs <Competitor>), each with its own fields."""
     text = re.sub(r"<!--.*?-->", "", path.read_text(encoding="utf-8"), flags=re.S)
     sections: dict[str, dict] = {}
-    section = entry = None
+    section = entry = matchup = None
     for lineno, raw in enumerate(text.splitlines(), 1):
         line = raw.rstrip()
+        where = f"{path.name}:{lineno}"
         if line.startswith("## "):
             section = line[3:].strip().lower()
             sections.setdefault(section, {"fields": {}, "entries": {}, "items": []})
-            entry = None
+            entry = matchup = None
         elif line.startswith("### ") and section:
-            entry = line[4:].strip()
+            entry, matchup = line[4:].strip(), None
             if entry in sections[section]["entries"]:
-                raise IntelError(f"{path.name}:{lineno}: duplicate entry '{entry}' in '{section}'")
-            sections[section]["entries"][entry] = {"name": entry}
+                raise IntelError(f"{where}: duplicate entry '{entry}' in '{section}'")
+            sections[section]["entries"][entry] = {"name": entry, "matchups": []}
+        elif line.startswith("#### ") and section:
+            m = re.match(r"^####\s+vs\.?\s+(.+)$", line, re.I)
+            if not m or not entry or section != "our products":
+                raise IntelError(f"{where}: '####' is only for '#### vs <Competitor>' under a product")
+            matchup = {"competitor": m.group(1).strip()}
+            sections[section]["entries"][entry]["matchups"].append(matchup)
         elif re.match(r"^\s*[-*] ", line) and section:
             body = re.sub(r"^\s*[-*] ", "", line).strip()
             m = re.match(r"^([a-z_]+):\s*(.*)$", body)
@@ -197,21 +211,37 @@ def parse_watchlist(path: Path) -> dict:
                 sections[section]["items"].append(body)
                 continue
             key, value = m.group(1), m.group(2).strip()
-            target = sections[section]["entries"][entry] if entry else sections[section]["fields"]
+            if matchup is not None:
+                target = matchup
+            elif entry:
+                target = sections[section]["entries"][entry]
+            else:
+                target = sections[section]["fields"]
             target[key] = split_list(value) if key in LIST_FIELDS else value
     return sections
 
 
+def _yes(value) -> bool:
+    return str(value).strip().lower() in {"yes", "true", "y", "1"}
+
+
 def load_config(wdir: Path) -> dict:
+    """Parse watchlist.md into products, competitor entities, matchups and watches.
+
+    The model mirrors how competitive maps are usually written: per product, a list
+    of competitors with a competition type, an angle ("how they compete") and
+    product-specific search terms. Competitor entities hold brand-level facts
+    (domain, parent group, ambiguity) shared across every product they touch.
+    """
     path = wdir / "watchlist.md"
     if not path.is_file():
         raise IntelError(f"Missing {path}. Run: intel.py init --watch <slug>")
     s = parse_watchlist(path)
     get = lambda name: s.get(name, {"fields": {}, "entries": {}, "items": []})
+    errors, warnings = [], []
 
     settings = dict(DEFAULT_SETTINGS)
     settings.update(get("settings")["fields"])
-    errors, warnings = [], []
     for key in INT_SETTINGS:
         try:
             settings[key] = int(settings[key])
@@ -219,59 +249,151 @@ def load_config(wdir: Path) -> dict:
             errors.append(f"Settings: {key} must be an integer (got {settings[key]!r})")
     if isinstance(settings.get("outputs"), str):
         settings["outputs"] = split_list(settings["outputs"])
+    if settings["group_by"] not in ("tier", "product"):
+        errors.append("Settings: group_by must be 'tier' or 'product'")
     settings.setdefault("watch", wdir.name)
 
-    known = {"settings", "our products", "competitors"} | BULLET_SECTIONS
+    known = {"settings"} | ENTRY_SECTIONS | BULLET_SECTIONS
     for name, sec in s.items():
         if name not in known:
             warnings.append(f"Unknown section '## {name}' is ignored")
-        elif sec["entries"] and name not in ("our products", "competitors"):
+        elif sec["entries"] and name not in ENTRY_SECTIONS:
             errors.append(f"'### {next(iter(sec['entries']))}' sits under '## {name}'; "
-                          "### entries belong under Our Products or Competitors")
+                          "### entries belong under Our Products, Competitors or Group Watches")
 
+    # -- products
     products = list(get("our products")["entries"].values())
-    competitors = list(get("competitors")["entries"].values())
-    for row in products + competitors:
-        row["status"] = str(row.get("status", "active")).lower()
-        for f in LIST_FIELDS - {"outputs"}:
-            row.setdefault(f, [])
-    product_names = {p["name"] for p in products}
-    active_products = {p["name"] for p in products if p["status"] == "active"}
-
+    for p in products:
+        p["status"] = str(p.get("status", "active")).lower()
+        p["lifecycle"] = str(p.get("lifecycle", "current")).lower()
+        p["priority"] = str(p.get("priority", "normal")).lower()
+        for f in ("aliases", "markets", "siblings"):
+            p.setdefault(f, [])
+        if p["priority"] not in PRIORITY:
+            errors.append(f"Product '{p['name']}': priority must be high, normal or low")
+    by_product = {p["name"]: p for p in products}
+    active_products = [p["name"] for p in products if p["status"] == "active"]
     if not products:
         errors.append("Our Products: add at least one product (### Name)")
-    for c in competitors:
-        unknown = [x for x in c["competes_with"] if x not in product_names]
-        if unknown:
-            errors.append(f"Competitor '{c['name']}': competes_with names unknown product(s) {unknown}")
-        if c["status"] == "active" and not c["keywords"]:
-            errors.append(f"Competitor '{c['name']}': active competitors need keywords")
-        if c["status"] == "active" and not c["competes_with"]:
-            warnings.append(f"Competitor '{c['name']}': no competes_with; items cannot be mapped to a product")
-        if c["status"] == "active" and c["competes_with"] and not set(c["competes_with"]) & active_products:
-            c["status"] = "inactive"
-            warnings.append(f"Competitor '{c['name']}': all its products are paused; skipping")
+
+    # -- competitor entities
+    entities = get("competitors")["entries"]
+    for e in entities.values():
+        e.pop("matchups", None)
+        e["status"] = str(e.get("status", "active")).lower()
+        e["ambiguous"] = _yes(e.get("ambiguous", "no"))
+        for f in ("aliases", "products", "keywords", "exclude", "competes_with"):
+            e.setdefault(f, [])
+
+    # Shorthand: competes_with on an entity == a plain direct matchup on each product.
+    for e in entities.values():
+        for pname in e["competes_with"]:
+            if pname not in by_product:
+                errors.append(f"Competitor '{e['name']}': competes_with names unknown product '{pname}'")
+            elif not any(m["competitor"] == e["name"] for m in by_product[pname]["matchups"]):
+                by_product[pname]["matchups"].append({"competitor": e["name"], "type": "direct"})
+
+    # -- matchups
+    internal_names = set()
+    for p in products:  # our own products, aliases and siblings are never competitors
+        internal_names.update([p["name"], *p["aliases"], *p["siblings"]])
+        for m in p["matchups"]:
+            m["product"] = p["name"]
+            m["type"] = str(m.get("type", "direct")).lower()
+            for f in ("keywords", "exclude"):
+                m.setdefault(f, [])
+            if m["type"] not in MATCHUP_TYPES:
+                errors.append(f"{p['name']} vs {m['competitor']}: type must be direct, adjacent or internal")
+            if m["type"] == "internal":
+                internal_names.add(m["competitor"])
+                continue
+            if m["competitor"] not in entities:  # allowed: entity inferred from the matchup
+                entities[m["competitor"]] = {"name": m["competitor"], "status": "active", "ambiguous": False,
+                                             "aliases": [], "products": [], "keywords": [], "exclude": [],
+                                             "competes_with": [], "inferred": True}
+
+    for e in entities.values():
+        if e.get("parent") and e["parent"] not in entities:
+            errors.append(f"Competitor '{e['name']}': parent '{e['parent']}' is not a ### entry under Competitors")
+    children: dict[str, list[str]] = {}
+    for e in entities.values():
+        if e.get("parent"):
+            children.setdefault(e["parent"], []).append(e["name"])
+
+    def family(name: str) -> set[str]:
+        """An entity plus all its descendants: news about a parent affects every brand under it."""
+        out, stack = set(), [name]
+        while stack:
+            n = stack.pop()
+            if n not in out:
+                out.add(n)
+                stack.extend(children.get(n, []))
+        return out
+
+    matchups = [m for p in products for m in p["matchups"] if m["type"] != "internal"]
+    for e in entities.values():
+        fam = family(e["name"])
+        rows = [m for m in matchups if m["competitor"] in fam]
+        e["affects"] = sorted({m["product"] for m in rows if m["product"] in active_products})
+        e["directness"] = min((MATCHUP_TYPES[m["type"]] for m in rows if m["type"] in MATCHUP_TYPES), default=9)
+        if e["status"] == "active" and not e["affects"]:
+            e["status"] = "inactive"
+            if rows:
+                warnings.append(f"Competitor '{e['name']}': all its products are paused; skipping")
+            elif not e.get("inferred"):
+                warnings.append(f"Competitor '{e['name']}': not matched to any product; skipping")
+        own_kw = e["keywords"] or [kw for m in rows if m["competitor"] == e["name"] for kw in m["keywords"]]
+        if e["status"] == "active" and not own_kw and not children.get(e["name"]):
+            errors.append(f"Competitor '{e['name']}': needs keywords (on the entity or its matchups)")
+        if e["name"] in internal_names:
+            errors.append(f"'{e['name']}' is listed as internal/sibling but also as a competitor")
+
+    # -- group watches: standing, cross-product watches (e.g. consolidation moves)
+    groups = list(get("group watches")["entries"].values())
+    for g in groups:
+        g.pop("matchups", None)
+        g["status"] = str(g.get("status", "active")).lower()
+        for f in ("affects", "competitors", "keywords", "exclude"):
+            g.setdefault(f, [])
+        for pname in g["affects"]:
+            if pname not in by_product:
+                errors.append(f"Group watch '{g['name']}': affects unknown product '{pname}'")
+        for cname in g["competitors"]:
+            if cname not in entities:
+                warnings.append(f"Group watch '{g['name']}': competitor '{cname}' is not on the watchlist")
+        if g["status"] == "active" and not g["keywords"]:
+            errors.append(f"Group watch '{g['name']}': needs keywords")
+    active_groups = [g["name"] for g in groups if g["status"] == "active"]
 
     exclusions = [unquote(x) for x in get("global exclusions")["items"]]
-    for c in competitors:
-        for kw in c["keywords"]:
-            hit = [e for e in exclusions if e and e.lower() in unquote(kw).lower()]
-            if hit:
-                warnings.append(f"Competitor '{c['name']}': keyword {kw} overlaps exclusion {hit}")
+    active_entities = [n for n, e in entities.items() if e["status"] == "active"]
 
     return {
-        "path": str(wdir / "watchlist.md"),
+        "path": str(path),
         "settings": settings,
         "products": products,
-        "competitors": competitors,
-        "active_products": sorted(active_products),
-        "active_competitors": [c["name"] for c in competitors if c["status"] == "active"],
+        "competitors": list(entities.values()),
+        "group_watches": groups,
+        "active_products": active_products,
+        "active_competitors": active_entities,
+        "active_groups": active_groups,
+        "watch_keys": active_entities + [GROUP_PREFIX + g for g in active_groups] + [MARKET_KEY],
         "market_watches": get("market watches")["items"],
+        "noise_terms": [unquote(x) for x in get("noise terms")["items"]],
         "global_exclusions": exclusions,
+        "internal_names": sorted(internal_names),
         "suggestions": get("suggestions")["items"],
         "errors": errors,
         "warnings": warnings,
     }
+
+
+def entity_of(cfg: dict, name: str) -> dict | None:
+    return next((e for e in cfg["competitors"] if e["name"] == name), None)
+
+
+def product_of(cfg: dict, name: str) -> dict | None:
+    return next((p for p in cfg["products"] if p["name"] == name), None)
 
 
 # ------------------------------------------------------------------------- state
@@ -291,7 +413,7 @@ def plan_window(cfg: dict, state: dict, now: dt.datetime) -> dict:
     default_since = now - dt.timedelta(days=st["lookback_days"])
     overlap = dt.timedelta(days=st["overlap_days"])
     out = {}
-    for key in cfg["active_competitors"] + [MARKET_KEY]:
+    for key in cfg["watch_keys"]:
         cut = state["cutoffs"].get(key)
         since = parse_time(cut) - overlap if cut else default_since
         out[key] = iso(since)
@@ -365,21 +487,30 @@ def do_dedupe(digest: dict, state: dict) -> list[dict]:
     return removed
 
 
-def rank_key(item: dict):
+def rank_key(item: dict, cfg: dict):
+    """Tier, then product priority, directness of competition, breadth, confidence, recency."""
     pub = item.get("published_at") or "1970-01-01"
     try:
         ts = -parse_time(pub).timestamp()
     except ValueError:
         ts = 0
+    prods = [product_of(cfg, n) for n in item.get("our_products") or []]
+    prio = min((PRIORITY.get(p["priority"], 1) for p in prods if p), default=1)
+    ent = entity_of(cfg, item.get("competitor", ""))
+    direct = ent["directness"] if ent else 5
+    if ent and ent.get("priority") == "high":
+        direct -= 0.5
     conf = {"high": 0, "medium": 1, "low": 2}.get(item.get("confidence"), 3)
-    return (item.get("tier", 9), -len(item.get("our_products") or []), conf, ts)
+    return (item.get("tier", 9), prio, direct, -len(prods), conf, ts)
 
 
 def validate_digest(digest: dict, cfg: dict) -> tuple[list[str], list[str]]:
     errors, warnings = [], []
     products = set(cfg["active_products"])
-    competitors = set(cfg["active_competitors"])
-    excl = [e.lower() for e in cfg["global_exclusions"] if e]
+    competitors = {e["name"]: e for e in cfg["competitors"]}
+    groups = set(cfg["active_groups"])
+    excl = [n.lower() for n in cfg["global_exclusions"] if n]
+    internal = set(excl) | {n.lower() for n in cfg["internal_names"]}
     cap = cfg["settings"]["max_items"]
     if len(digest["items"]) > cap:
         errors.append(f"{len(digest['items'])} items exceeds max_items={cap}; move the rest to suppressed")
@@ -398,8 +529,18 @@ def validate_digest(digest: dict, cfg: dict) -> tuple[list[str], list[str]]:
         unknown = [p for p in item.get("our_products") or [] if p not in products]
         if unknown:
             errors.append(f"{tag}: our_products {unknown} are not active products in the watchlist")
-        if item.get("competitor") and item["competitor"] not in competitors:
-            warnings.append(f"{tag}: competitor '{item['competitor']}' is not on the watchlist; add a suggestion")
+        comp = item.get("competitor", "")
+        if comp.lower() in internal:
+            errors.append(f"{tag}: '{comp}' is one of ours (sibling, internal or global exclusion), not a competitor")
+        ent = competitors.get(comp)
+        if item.get("group_watch") and item["group_watch"] not in groups:
+            errors.append(f"{tag}: group_watch '{item['group_watch']}' is not an active Group Watch")
+        if comp and not ent and not item.get("group_watch") and comp.lower() not in internal:
+            warnings.append(f"{tag}: competitor '{comp}' is not on the watchlist; add a suggestion")
+        elif ent and not item.get("group_watch"):
+            off_map = [p for p in item.get("our_products") or [] if p not in ent["affects"]]
+            if off_map:
+                warnings.append(f"{tag}: no {comp} matchup for {off_map}; confirm the impact or add a matchup suggestion")
         src = item.get("source") or {}
         for f in ("title", "publisher", "url"):
             if not src.get(f):
@@ -413,10 +554,9 @@ def validate_digest(digest: dict, cfg: dict) -> tuple[list[str], list[str]]:
                 parse_time(item["published_at"])
             except ValueError:
                 errors.append(f"{tag}: published_at is not an ISO date")
-        blob = " ".join([src.get("url", ""), item.get("competitor", "")]).lower()
-        hit = [e for e in excl if e in blob]
+        hit = [e for e in excl if e in src.get("url", "").lower()]
         if hit:
-            warnings.append(f"{tag}: matches global exclusion {hit}; is this really competitor news?")
+            warnings.append(f"{tag}: source URL matches exclusion {hit}; is this really competitor news?")
     return errors, warnings
 
 
@@ -432,6 +572,27 @@ def fmt_date(value: str) -> str:
         return str(value or "")
 
 
+def digest_sections(d: dict, cfg: dict) -> list[tuple[str, list[dict]]]:
+    """Ordered (heading, items). By tier, or by our product so the report reads
+    'what happened to your competitors, by product line'."""
+    if cfg["settings"]["group_by"] != "product":
+        return [(f"Tier {t} · {TIER_LABEL[t]}", [x for x in d["items"] if x["tier"] == t]) for t in (1, 2)]
+    cross = [x for x in d["items"] if len(x["our_products"]) > 1 or x.get("group_watch")]
+    out = [("Cross-portfolio", cross)]
+    for p in cfg["active_products"]:
+        out.append((p, [x for x in d["items"] if x not in cross and x["our_products"][0] == p]))
+    return out
+
+
+def item_tags(x: dict, cfg: dict) -> list[str]:
+    tags = list(x["our_products"])
+    if cfg["settings"]["group_by"] == "product":
+        tags.insert(0, f"Tier {x['tier']} · {TIER_LABEL[x['tier']]}")
+    if x.get("group_watch"):
+        tags.append(f"Watch: {x['group_watch']}")
+    return tags + [x["category"], f"{x['confidence']} confidence", fmt_date(x["published_at"])]
+
+
 def render_markdown(d: dict, cfg: dict) -> str:
     st = cfg["settings"]
     lines = [f"# {st.get('company', 'Competitor')} competitor intel",
@@ -440,17 +601,16 @@ def render_markdown(d: dict, cfg: dict) -> str:
         lines += [d["summary"], ""]
     if not d["items"]:
         lines += ["**No material competitor developments this period.**", ""]
-    for tier in (1, 2):
-        items = [x for x in d["items"] if x["tier"] == tier]
+    for heading, items in digest_sections(d, cfg):
         if not items:
             continue
-        lines += [f"## Tier {tier} · {TIER_LABEL[tier]}", ""]
+        lines += [f"## {heading}", ""]
         for x in items:
             src = x["source"]
+            mark = "🔴 " if x["tier"] == 1 else ""
             lines += [
-                f"### {x['competitor']}: {x['headline']}",
-                f"**Affects:** {', '.join(x['our_products'])} · **Category:** {x['category']} · "
-                f"**Confidence:** {x['confidence']} · **Published:** {fmt_date(x['published_at'])}",
+                f"### {mark}{x['competitor']}: {x['headline']}",
+                " · ".join(f"`{t}`" for t in item_tags(x, cfg)),
                 "",
                 f"**What changed.** {x['what_changed']}",
                 "",
@@ -527,20 +687,18 @@ def render_html(d: dict, cfg: dict) -> str:
         parts.append(f"<p>{e(d['summary'])}</p>")
     if not d["items"]:
         parts.append("<p><strong>No material competitor developments this period.</strong></p>")
-    for tier in (1, 2):
-        items = [x for x in d["items"] if x["tier"] == tier]
+    for heading, items in digest_sections(d, cfg):
         if not items:
             continue
-        parts.append(f"<h2>Tier {tier} · {TIER_LABEL[tier]}</h2>")
+        parts.append(f"<h2>{e(heading)}</h2>")
         for x in items:
             src = x["source"]
-            tags = [*x["our_products"], x["category"], f"{x['confidence']} confidence", fmt_date(x["published_at"])]
             refs = [f"<a href='{e(src['url'])}' rel='noopener'>{e(src['title'])}</a> — {e(src['publisher'])}"]
             refs += [f"<a href='{e(c['url'])}' rel='noopener'>{e(c.get('title', c['url']))}</a>"
                      for c in x.get("corroboration") or [] if c.get("url")]
             parts.append(
-                f"<article class='t{tier}'><h3>{e(x['competitor'])}: {e(x['headline'])}</h3>"
-                f"<div class='tags'>{''.join(f'<span>{e(t)}</span>' for t in tags)}</div>"
+                f"<article class='t{x['tier']}'><h3>{e(x['competitor'])}: {e(x['headline'])}</h3>"
+                f"<div class='tags'>{''.join(f'<span>{e(t)}</span>' for t in item_tags(x, cfg))}</div>"
                 f"<p><strong>What changed.</strong> {e(x['what_changed'])}</p>"
                 f"<p><strong>Why it matters.</strong> {e(x['why_it_matters'])}</p>"
                 + (f"<p><strong>Follow up.</strong> {e(x['follow_up'])}</p>" if x.get("follow_up") else "")
@@ -607,29 +765,63 @@ def cmd_list(args) -> int:
     return 0
 
 
+def build_queries(cfg: dict, window: dict) -> list[dict]:
+    """Starting query set. Matchup keywords carry product context; entity keywords catch
+    brand-level news (funding, M&A) for every product the entity or its brands touch.
+
+    Global exclusions are deliberately NOT negated in queries: '-"OurBrand"' would drop
+    exactly the stories where a competitor wins a customer from us. They are applied
+    when validating items instead. Only Noise Terms and per-row excludes are negated.
+    """
+    since = window["since_by_watch"]
+    plan: dict[str, dict] = {}
+
+    def add(key, kw, products, excludes, matchup=None, verify=None, noise=True):
+        terms = [*excludes, *(cfg["noise_terms"] if noise else [])]
+        neg = list(dict.fromkeys(unquote(x) for x in terms if x))[:MAX_NEGATIVES]
+        q = " ".join([kw, *(f'-"{n}"' for n in neg)]).strip()
+        row = plan.setdefault(q, {"watch": key, "query": q, "since": since[key], "products": [], "matchups": []})
+        row["products"] = sorted(set(row["products"]) | set(products))
+        if matchup:
+            row["matchups"].append(matchup)
+        if verify:
+            row["verify"] = verify
+
+    active = set(cfg["active_products"])
+    for e in cfg["competitors"]:
+        if e["status"] != "active":
+            continue
+        verify = e.get("verify") or ("Ambiguous name: confirm the article is about this company"
+                                     if e["ambiguous"] else None)
+        for p in cfg["products"]:
+            if p["name"] not in active:
+                continue
+            for m in p["matchups"]:
+                if m["competitor"] != e["name"] or m["type"] == "internal":
+                    continue
+                label = f"{p['name']} vs {e['name']} ({m['type']})"
+                for kw in m["keywords"]:
+                    add(e["name"], kw, [p["name"]], [*e["exclude"], *m["exclude"]], label, verify)
+        for kw in e["keywords"]:
+            add(e["name"], kw, e["affects"], e["exclude"], None, verify)
+        if e.get("domain"):
+            add(e["name"], f"site:{e['domain']} news OR announces OR launches", e["affects"], [], noise=False)
+    for g in cfg["group_watches"]:
+        if g["status"] == "active":
+            for kw in g["keywords"]:
+                add(GROUP_PREFIX + g["name"], kw, g["affects"], g["exclude"])
+    for term in cfg["market_watches"]:
+        add(MARKET_KEY, term, [], [])
+    return list(plan.values())
+
+
 def cmd_config(args) -> int:
     wdir = watch_dir(args)
     cfg = load_config(wdir)
     if args.plan:
-        state = load_state(wdir)
-        window = plan_window(cfg, state, now_utc())
-        neg = " ".join(f'-"{x}"' for x in cfg["global_exclusions"][:6])
-        queries = []
-        for c in cfg["competitors"]:
-            if c["status"] != "active":
-                continue
-            local_neg = " ".join(f'-"{unquote(x)}"' for x in c["exclude"])
-            for kw in c["keywords"]:
-                queries.append({"watch": c["name"], "query": f"{kw} {local_neg} {neg}".strip(),
-                                "since": window["since_by_watch"][c["name"]]})
-            if c.get("domain"):
-                queries.append({"watch": c["name"], "query": f"site:{c['domain']} news OR announces OR launches",
-                                "since": window["since_by_watch"][c["name"]]})
-        for term in cfg["market_watches"]:
-            queries.append({"watch": MARKET_KEY, "query": f"{term} {neg}".strip(),
-                            "since": window["since_by_watch"][MARKET_KEY]})
+        window = plan_window(cfg, load_state(wdir), now_utc())
         cfg["window"] = window
-        cfg["queries"] = queries
+        cfg["queries"] = build_queries(cfg, window)
     print(json.dumps(cfg, indent=2, ensure_ascii=False))
     return 1 if cfg["errors"] else 0
 
@@ -645,7 +837,7 @@ def cmd_prepare(args) -> int:
     digest.setdefault("window", plan_window(cfg, state, now_utc()))
     do_fingerprint(digest)
     removed = do_dedupe(digest, state)
-    digest["items"].sort(key=rank_key)
+    digest["items"].sort(key=lambda x: rank_key(x, cfg))
     if removed:
         digest.setdefault("suppressed", {}).setdefault("already_seen", []).extend(removed)
     write_json(path, digest)
@@ -713,7 +905,7 @@ def cmd_commit(args) -> int:
     now = now_utc()
     until = digest["window"]["until"]
     gaps = {g.get("competitor") for g in digest.get("coverage_gaps") or []}
-    for key in cfg["active_competitors"] + [MARKET_KEY]:
+    for key in cfg["watch_keys"]:
         if key not in gaps:
             state["cutoffs"][key] = until
     for x in digest["items"]:

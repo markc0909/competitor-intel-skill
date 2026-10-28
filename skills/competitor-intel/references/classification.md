@@ -30,6 +30,18 @@ Classify every candidate event **before** writing anything about it. If you summ
 
 **Borderline means suppress.** A missed minor item costs less than a digest people learn to ignore.
 
+## Use the watchlist's map
+
+The watchlist says *why* each competitor matters. Use it:
+
+- **Matchup `type`.** News from a `direct` rival about the matched product is the default case. News from an `adjacent` rival is normally Tier 3, **unless** it shows the `watch_for` move (for example, an adjacent vendor launching a module that competes head-on). Then it's at least Tier 2, and Tier 1 if it's a launch into our customer base.
+- **Matchup `how`.** This is the angle to test the news against. If a best-of-breed rival's pitch is "works with every suite", then its new integration with a suite incumbent matters *because of* that pitch. Say so in `why_it_matters`. Never cite `how` as a fact: it's a prior, written when the map was made.
+- **Product `lifecycle: sunsetting`.** This is a live churn-risk window. Competitor migration offers, "switch from" campaigns, and public customer wins aimed at that product's base are **Tier 1**.
+- **Product `priority: low`.** Report it only if it's Tier 1, or if it clearly ties to a deal in play.
+- **Competitor `parent`.** Treat news about a parent group (a fund, holding company, or acquirer) as news about every brand under it. List every one of our products those brands touch.
+- **Group watches.** A consolidation move that touches two or more of our products is Tier 1 by default. Set `group_watch` on the item.
+- **`ambiguous` / `verify`.** Drop any result you can't tie to the right company by domain, product, or market. A name collision, such as a different company with a similar name, is never an item.
+
 ## Categories
 
 `funding`, `m&a`, `leadership`, `geography`, `customer`, `regulatory`, `product`, `partnership`, `pricing`, `incident`, `event`, `other`

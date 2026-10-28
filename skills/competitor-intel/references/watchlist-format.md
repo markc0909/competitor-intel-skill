@@ -1,88 +1,118 @@
 # Watchlist format
 
-`watchlist.md` is ordinary Markdown with a small number of conventions, so a person can edit it in any editor and `intel.py` can parse it the same way every time.
+`watchlist.md` is ordinary Markdown with a few conventions. A person can edit it in any editor, and `intel.py` parses it the same way every time.
+
+The model follows how competitive maps are usually written: **per product**, a list of the rivals that compete with it, each with a competition type, the angle they compete on, and search terms specific to that product. Facts about a competitor that hold across every product (its domain, parent group, and whether its name is ambiguous) are written once, under Competitors.
 
 ## Syntax
 
 | Element | Meaning |
 |---|---|
 | `## Section` | One of the sections below. Case-insensitive. |
-| `### Entry` | One product (under Our Products) or one competitor (under Competitors). The heading text is the entry's canonical name. |
-| `- key: value` | A field on the current entry, or a setting under `## Settings`. Keys are lowercase with underscores. |
-| `- plain text` | A list item, used in Market Watches, Global Exclusions, Suggestions, and Change Log. |
+| `### Entry` | A product, a competitor, or a group watch. The heading text is its canonical name. |
+| `#### vs Competitor` | A **matchup** under a product, describing one competitor in relation to that product. |
+| `- key: value` | A field on the nearest entry or matchup, or a setting under `## Settings`. |
+| `- plain text` | A list item, in Market Watches, Noise Terms, Global Exclusions, Suggestions, and Change Log. |
 | `<!-- … -->` | A comment. The parser ignores it. |
 
-List fields are comma-separated. A value in double quotes is one term, even if it contains a comma, and the quotes are kept because they mean "exact phrase" to a search engine. For example: `keywords: "Smith, Jones & Co", smithjones.example`.
+List fields are comma-separated. A value in double quotes is one term, even with commas inside, and the quotes are kept because they mean "exact phrase" to a search engine.
 
-## Sections
-
-### Settings
+## Settings
 
 | Key | Default | Meaning |
 |---|---|---|
 | `watch` | folder name | Slug for this watch |
 | `company` | — | Your company name, used in report titles |
-| `cadence` | `weekly` | `daily`, `weekly`, or `monthly`. Informational: the schedule actually controls when runs happen. Keep the two in sync. |
-| `lookback_days` | 7 | Search window for a competitor's first run, or after a reset |
+| `cadence` | `weekly` | `daily`, `weekly`, or `monthly`. Informational: the schedule controls when runs actually happen. |
+| `lookback_days` | 7 | Search window for a first run |
 | `overlap_days` | 2 | How far each window reaches back before the last cutoff, to catch late-indexed stories |
 | `max_items` | 8 | Hard cap on Tier 1 + Tier 2 items per digest |
 | `seen_window_days` | 90 | How long reported events are remembered for dedupe |
-| `timezone` | `UTC` | IANA name, such as `America/New_York`. Used for dates in log lines. |
+| `timezone` | system | IANA name, used for dates in log lines |
+| `group_by` | `tier` | `product` groups the report by our product line, with a Cross-portfolio section first. `tier` groups by Act now / Worth knowing. |
 | `outputs` | `markdown, html, chat` | Which files `render` writes |
 | `quiet_runs` | `note` | `note` delivers a one-line "nothing material" message. `silent` delivers nothing. |
-| `deliver_to` | `local` | Comma-separated destinations. See `scheduling.md`. |
+| `deliver_to` | `local` | Destinations. See `scheduling.md`. |
 
-### Our Products
+## Our Products
 
 One `###` entry per product:
 
-| Key | Required | Meaning |
-|---|---|---|
-| `status` | yes | `active` or `paused`. Competitors whose only products are paused are skipped. |
-| `description` | recommended | One line. Helps Claude write a specific "why it matters". |
-| `aliases` | no | Other names for the product |
-| `markets` | no | Geographies or segments, for judging relevance |
+| Key | Meaning |
+|---|---|
+| `status` | `active` or `paused`. Paused products are not monitored. |
+| `lifecycle` | `current` (default), `sunsetting`, or `legacy`. A sunsetting product is a **churn-risk window**: competitor migration offers and customer wins against it rank higher (see classification.md). |
+| `priority` | `high`, `normal` (default), or `low`. Used when ranking and cutting items. Set `low` for legacy lines that only matter when specific deals are in play. |
+| `area` | Portfolio grouping, such as "UK CRM" or "Payments" |
+| `markets` | Geographies or segments |
+| `description` | One line on what the product is, so Claude can write a specific "why it matters" |
+| `aliases` | Other names for the product |
+| `siblings` | Other products **we** own that sell into the same market. These are never competitors. |
 
-### Competitors
+Our product names, aliases, and siblings are automatically treated as "ours": an item whose competitor is one of them fails validation.
 
-One `###` entry per competitor:
+### Matchups: `#### vs <Competitor>`
 
-| Key | Required | Meaning |
-|---|---|---|
-| `status` | yes | `active` or `paused` |
-| `competes_with` | yes | Exact `###` names from Our Products |
-| `keywords` | yes if active | Search terms. Start with the quoted brand name. |
-| `domain` | no | Official domain. Adds a `site:` newsroom query. |
-| `products` | no | The competitor's own product names. Useful context and good keywords. |
-| `exclude` | no | Terms to negate in this competitor's queries |
-| `priority` | no | `high` or `normal`. A tie-breaker when ranking. |
-| `notes` | no | Free text for people. Ignored by the script. |
+Under a product, one block per real, in-market rival. Leave out aspirational or loosely adjacent players.
 
-### Market Watches
+| Key | Meaning |
+|---|---|
+| `type` | `direct` (default), `adjacent`, or `internal`. **Direct**: same buyers, same job. **Adjacent**: not competing today, but watch for a specific move. **Internal**: one of ours (such as a migration path); never searched, and automatically excluded. |
+| `role` | A short label for their position, such as `incumbent leader`, `growth challenger`, `suite incumbent`, `category leader`, `independent specialist`, `migration target`, `niche`, or `name-collision risk` |
+| `how` | How they actually compete with this product. This is the angle Claude uses to judge impact and write "why it matters". **It's context, not evidence**: never cite it as a current fact. |
+| `watch_for` | For adjacent rivals: the move that would make them direct, such as "move upmarket into sales CRM". If news shows that move, it's at least Tier 2. |
+| `keywords` | Search terms specific to this matchup, such as "Rival Books New Zealand" under an NZ product or "Rival Books migration" under a sunsetting one |
+| `exclude` | Extra negative terms for this matchup's queries |
 
-Bullets with category-level queries that run once per run, not once per competitor. Use them to catch new entrants and industry-wide moves. For example: `"embedded payments" acquisition`.
+The `<Competitor>` name must match a `### Competitors` entry if one exists. If no entry exists, a minimal one is created automatically.
 
-### Global Exclusions
+Shorthand: a competitor entry with `competes_with: Product A, Product B` is the same as a plain `direct` matchup under each of those products, with no product-specific keywords.
 
-Bullets with terms or domains that mark a result as not competitor news. These are added as negative terms to every query, and flagged if they show up in an item. **Always include your own brand and domain**, and any product name that collides with a competitor's.
+## Competitors
 
-### Suggestions
+One `###` entry per competing **company or brand**. These are brand-level facts shared across all of its matchups:
 
-Written by `intel.py commit` from the digest's `suggestions`. Nothing here is searched. When the user accepts a suggestion, move it into the right section and delete its line.
+| Key | Meaning |
+|---|---|
+| `status` | `active` or `paused` |
+| `keywords` | Brand-level search terms that catch company-wide news (funding, M&A, leadership) for every product the brand touches |
+| `domain` | Official domain. Adds a `site:` newsroom query. |
+| `parent` | A `### Competitors` entry that owns this brand, such as a product brand owned by a larger vendor. News about the parent maps to every product its brands compete with. |
+| `ambiguous` | `yes` when the name is a common word (such as Cover, Street, or Funnel) or collides with another company. Claude must confirm each result is about this company. |
+| `verify` | A specific disambiguation note, such as "PayCo here is the payments company, not PayCo Logistics". This implies `ambiguous`. |
+| `aliases`, `products` | Other names, and the competitor's own product names |
+| `exclude` | Negative terms for all of this brand's queries |
+| `priority` | `high` puts this brand ahead of others at the same tier when ranking |
+| `notes` | Free text for people. Ignored by the script. |
 
-### Change Log
+A competitor that only appears inside matchups doesn't need an entry. Add one when you have a domain, a parent, an ambiguity note, or brand-wide keywords.
 
-Bullets written by `intel.py log`. Keep one line per change, saying what changed and why. This is the audit trail for "why are we watching this?".
+## Group Watches
 
-## Example competitor entry
+A standing watch on a cross-product theme, such as a consolidation move, a PE roll-up, or a merger, where one deal can change the picture for several of our products at once. Each runs once per run.
 
-```markdown
-### Rival Books
-- status: active
-- domain: rivalbooks.example
-- competes_with: Acme Ledger
-- products: Rival Books Cloud, Rival Books Payroll
-- keywords: "Rival Books", rivalbooks.example, "Rival Books Cloud"
-- exclude: "rival books review", "rival books vs"
-- priority: high
-```
+| Key | Meaning |
+|---|---|
+| `status` | `active` or `paused` |
+| `affects` | Our products this theme touches |
+| `competitors` | The competitor entries involved |
+| `context` | One or two sentences on why this is being watched (context, not evidence) |
+| `keywords` | The theme's search terms |
+
+Items found through a group watch set `group_watch: <name>` in the digest and render in the **Cross-portfolio** section.
+
+## Market Watches
+
+Bullets with category-level queries for new entrants and industry moves.
+
+## Noise Terms
+
+Bullets that get negated in every query (except `site:` queries): listicle and SEO phrasing such as `best … software` or `top 10`. **Never put your own brand here.** It would hide the stories where a competitor wins one of your customers.
+
+## Global Exclusions
+
+Bullets for your own brand and domain, plus anything else that is never competitor news. These are **not** negated in searches. They're checked when items are validated: an item whose competitor matches one fails, and a source URL that matches one gets a warning.
+
+## Suggestions and Change Log
+
+`intel.py commit` appends `## Suggestions`, and `intel.py log` appends `## Change Log`. Nothing under Suggestions is searched until it's promoted into a real section.

@@ -17,8 +17,8 @@ Each run produces exactly one digest JSON. Every output is rendered from it. See
       "event_fingerprint": "…",                    // written by prepare. Never hand-write this.
       "tier": 1,                                   // required: 1 or 2
       "category": "funding",                       // required: see classification.md
-      "competitor": "PayCo",                       // required: exact ### name from the watchlist
-      "our_products": ["Acme Pay"],                // required: exact ### names, active products only
+      "competitor": "PayCo",                       // required: exact competitor name (entity, matchup or parent)
+      "our_products": ["Acme Pay"],                // required: exact ### names, active products only. First = primary.
       "headline": "PayCo raises $80M Series C",    // required
       "what_changed": "Facts only.",               // required
       "why_it_matters": "Implication for the named product.", // required
@@ -28,7 +28,8 @@ Each run produces exactly one digest JSON. Every output is rendered from it. See
         "title": "…", "publisher": "…", "url": "https://…"
       },
       "corroboration": [ { "title": "…", "publisher": "…", "url": "https://…" } ], // optional
-      "follow_up": "One concrete next action."     // optional
+      "follow_up": "One concrete next action.",    // optional
+      "group_watch": "Rival Group roll-up"           // optional: exact ### name from Group Watches
     }
   ],
   "suppressed": {
@@ -36,10 +37,10 @@ Each run produces exactly one digest JSON. Every output is rendered from it. See
     // "already_seen": [...]                        // written by prepare
   },
   "coverage_gaps": [                               // competitors whose searches failed this run
-    { "competitor": "PayCo", "reason": "search tool timed out" }  // use "_market" for market watches
+    { "competitor": "PayCo", "reason": "search tool timed out" }  // or "_group:<name>", "_market"
   ],
   "suggestions": [                                 // proposed watchlist changes; commit appends these
-    { "type": "competitor|keyword|exclusion|product", "value": "LedgerLite", "reason": "…" }
+    { "type": "competitor|matchup|keyword|exclusion|noise|product", "value": "LedgerLite", "reason": "…" }
   ]
 }
 ```
@@ -49,3 +50,7 @@ Each run produces exactly one digest JSON. Every output is rendered from it. See
 `event_fingerprint = sha256(norm(competitor) | norm(category) | norm(event_key))`, where `norm` lowercases the text and collapses anything that isn't alphanumeric to `-`. Because the hash ignores the headline and the URL, a new article about an already-reported event still dedupes, as long as you reuse the same `event_key`. That's why keys must describe the event, not the article.
 
 Dedupe also matches on canonical source URL. Canonicalising lowercases the host, drops `www.`, strips tracking parameters and fragments, and removes trailing slashes.
+
+## Product grouping
+
+With `group_by: product`, items affecting two or more products, or carrying a `group_watch`, go in **Cross-portfolio**. Every other item goes under its first `our_products` entry, so put the most-affected product first.
