@@ -43,7 +43,15 @@ A run makes dozens of web searches and page fetches. By default Claude Code asks
 }
 ```
 
-Or tell Claude: *"Allow WebSearch, WebFetch and the competitor-intel script in my user settings."*
+Or, to have Claude do it, paste this into Claude Code. It asks you once to approve the edit to your settings file. Start a new session afterwards.
+
+```text
+Add these three rules to the "permissions.allow" list in my user settings file,
+~/.claude/settings.json: "WebSearch", "WebFetch", and
+"Bash(python3 */competitor-intel/scripts/intel.py *)".
+If the file doesn't exist, create it. If it already has settings or a permissions
+block, merge these in and keep everything else unchanged. Show me the file afterwards.
+```
 
 - [ ] A run finishes without asking you to approve searches, fetches, or `intel.py` commands.
 
