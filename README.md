@@ -37,6 +37,8 @@ git clone https://github.com/markc0909/competitor-intel-skill.git && ./competito
 
 Requirements: Python 3.9+ (stdlib only), plus a web search tool in Claude.
 
+**Testing it for the first time?** Follow [TESTING.md](TESTING.md): an offline smoke test, a live test in Claude, and an optional scheduling check, each with what to expect.
+
 ## Quick start
 
 1. In Claude, say: **"Set up a competitor watch for my company."** Describe your products and competitors in a sentence or two. Claude drafts `~/.competitor-intel/<watch>/watchlist.md` and shows it to you to confirm.
@@ -56,6 +58,7 @@ skills/competitor-intel/
   templates/example-digest.json  synthetic digest fixture for testing renderers
   references/                watchlist format, classification rules, digest schema, scheduling
 install.sh                   copy-install for ~/.claude/skills
+TESTING.md                   install-and-test checklist for first-time users
 ```
 
 ## The helper CLI
@@ -85,8 +88,10 @@ cp skills/competitor-intel/templates/example-digest.json "$COMPETITOR_INTEL_HOME
 $INTEL prepare --input "$COMPETITOR_INTEL_HOME/d.json"
 $INTEL render  --input "$COMPETITOR_INTEL_HOME/d.json"
 $INTEL commit  --input "$COMPETITOR_INTEL_HOME/d.json"
-$INTEL prepare --input "$COMPETITOR_INTEL_HOME/d.json"   # replay: both items removed as already seen
+$INTEL prepare --input "$COMPETITOR_INTEL_HOME/d.json"   # replay: all items removed as already seen
 ```
+
+It has worked if the first `prepare` reports `"items": 3` with no errors, `render` writes `index.html` (its path is in `attachment`), and the second `prepare` reports `"items": 0` because every item was already reported. [TESTING.md](TESTING.md) has the full checklist.
 
 ## Design notes
 
