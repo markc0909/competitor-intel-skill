@@ -30,7 +30,7 @@ List fields are comma-separated. A value in double quotes is one term, even with
 | `seen_window_days` | 90 | How long reported events are remembered for dedupe |
 | `timezone` | system | IANA name, used for dates in log lines |
 | `group_by` | `tier` | `product` groups the report by our product line, with a Cross-portfolio section first. `tier` groups by Act now / Worth knowing. |
-| `outputs` | `markdown, html, chat` | Which files `render` writes |
+| `outputs` | `markdown, html, chat` | Extra files `render` writes. `index.html` is always written, because every run's response attaches it. `markdown` adds `digest.md`, and `chat` adds `chat.txt`. |
 | `quiet_runs` | `note` | `note` delivers a one-line "nothing material" message. `silent` delivers nothing. |
 | `deliver_to` | `local` | Destinations. See `scheduling.md`. |
 

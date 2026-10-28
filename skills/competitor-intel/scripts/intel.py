@@ -867,16 +867,17 @@ def cmd_render(args) -> int:
     out = Path(args.out) if args.out else wdir / "runs" / run_id(digest)
     out.mkdir(parents=True, exist_ok=True)
     outputs = cfg["settings"]["outputs"]
-    files = {"digest.json": json.dumps(digest, indent=2, ensure_ascii=False) + "\n"}
+    # index.html is always written: every run's response attaches it.
+    files = {"digest.json": json.dumps(digest, indent=2, ensure_ascii=False) + "\n",
+             "index.html": render_html(digest, cfg)}
     if "markdown" in outputs:
         files["digest.md"] = render_markdown(digest, cfg)
-    if "html" in outputs:
-        files["index.html"] = render_html(digest, cfg)
     if "chat" in outputs:
         files["chat.txt"] = render_chat(digest, cfg)
     for name, body in files.items():
         atomic_write(out / name, body)
     manifest = {"run_id": run_id(digest), "out_dir": str(out), "files": sorted(files),
+                "attachment": str((out / "index.html").resolve()),
                 "event_fingerprints": [x["event_fingerprint"] for x in digest["items"]],
                 "quiet": not digest["items"]}
     write_json(out / "manifest.json", manifest)

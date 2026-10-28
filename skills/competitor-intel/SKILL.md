@@ -133,7 +133,7 @@ This canonicalises URLs, computes fingerprints, removes anything already reporte
 INTEL render --input <digest.json>
 ```
 
-Outputs go to `<watch>/runs/<run-id>/`. If `manifest.quiet` is true and `quiet_runs` is `silent`, deliver nothing and go straight to commit.
+Outputs go to `<watch>/runs/<run-id>/`. `index.html` is always written, and `manifest.attachment` gives its absolute path. If `manifest.quiet` is true and `quiet_runs` is `silent`, skip delivery to external destinations in step 7. You still attach the page in step 9.
 
 ### 7. Deliver
 
@@ -149,7 +149,13 @@ INTEL commit --input <digest.json> --delivered-to "<where>"
 
 This records the delivered events, advances each competitor's cutoff (except for coverage gaps), stores the Tier 3 counts, and appends any new suggestions to the watchlist's `## Suggestions` section. Running it again for the same run is a no-op, so a retried run won't alert twice.
 
-Finish with a short summary: the number of items, the top headline, any coverage gaps, any suggestions added, and where the outputs are.
+### 9. Respond, with the report attached
+
+Every run's final response **must include `index.html` as an attachment**: the file at `manifest.attachment`. This holds for interactive and scheduled runs alike, and for quiet runs too, when the page says nothing material happened. Attach it with whatever file-sharing tool the host provides, such as a send-file or attach-file tool, or the chat's own file output. Attach the file itself: don't paste its HTML into the message, and don't attach `digest.json` in its place. If the host has no way to attach a file, say so plainly and give the absolute path instead. Never claim it's attached when it isn't.
+
+Alongside the attachment, give a short summary: the number of items, the top headline, any coverage gaps, any suggestions added, and the path to the run folder.
+
+If the run stops early (a config error, or a failed delivery before commit), there's no new page to attach. Say why the run stopped instead.
 
 ## Maintain (prompt-driven watchlist changes)
 
@@ -180,4 +186,5 @@ Read the `## Suggestions` section. For each entry, give the user a one-line reco
 - Don't report a quiet period as activity just to show that the job ran.
 - Don't advance state after a partial failure. Leave that to `commit` and coverage gaps.
 - Generate all the outputs once from the single digest. Never write separate per-channel copies by hand.
+- Every completed run's response attaches that run's `index.html` (step 9).
 - `templates/example-digest.json` is a synthetic fixture. Never present it as real intelligence.

@@ -15,7 +15,7 @@ watchlist.md  ──►  Claude researches  ──►  intel.py dedupes & valida
 - **Prompt-driven upkeep.** Say "add LedgerLite as a competitor to Acme Ledger" or "stop tracking the term 'embedded finance'". Claude edits the file, validates it, and writes a line to the change log.
 - **Noise control.** Tier 1 (funding, M&A, leadership, regulatory), Tier 2 (launches, partnerships, pricing), and Tier 3 (listicles and SEO noise, which are only counted). Ten articles about one deal count as one event.
 - **Memory between runs.** `state.json` remembers what was already reported (by semantic fingerprint and canonical URL) and a cutoff for each competitor. A failed search never silently skips a week, and a re-run never alerts twice.
-- **One digest, many formats.** Markdown, a self-contained responsive HTML page, and chat text that pastes cleanly into Slack, Teams, or WhatsApp, all rendered from the same JSON so they can't disagree.
+- **One digest, many formats.** Markdown, a self-contained responsive HTML page, and chat text that pastes cleanly into Slack, Teams, or WhatsApp, all rendered from the same JSON so they can't disagree. Every run's response attaches the HTML report, including scheduled runs.
 - **Self-improving coverage.** Each run can suggest new competitors or keywords. They go into a `## Suggestions` section for you to accept or dismiss, and they're never applied automatically.
 
 ## Install

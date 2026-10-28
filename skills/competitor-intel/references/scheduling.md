@@ -13,7 +13,9 @@ render, deliver, commit. Ask no questions. Do not edit products or competitors
 in the watchlist; only append suggestions via commit. If config fails or
 delivery fails, do not commit — report the problem instead.
 Deliver to the destinations in the watchlist's deliver_to setting.
-End with a 3-line summary: item count, top headline, where outputs are.
+Attach the run's index.html (the manifest's "attachment" path) to your final
+response, even on a quiet run. End with a 3-line summary: item count, top
+headline, where outputs are.
 ```
 
 ## Option A: Claude desktop app scheduled task (recommended)
@@ -53,7 +55,7 @@ Claude Code's cloud scheduled agents (`/schedule`) run in a fresh cloud checkout
 
 | Value | What Claude does |
 |---|---|
-| `local` | Nothing extra. The files in `runs/<run-id>/` are the deliverable. |
+| `local` | Nothing extra. The files in `runs/<run-id>/` are the deliverable. The run's response attaches `index.html` whatever `deliver_to` says. |
 | `email:<address>` | Sends `digest.md` (or the HTML) through a connected email tool. If the tool can only draft, it creates a draft and says so. |
 | `slack:<#channel>` / `teams:<channel>` | Posts `chat.txt` through the connected Slack or Teams tool |
 | `notion:<page or database>` | Creates a page from `digest.md` under that parent |
