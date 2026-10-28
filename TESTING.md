@@ -27,6 +27,28 @@ git clone https://github.com/markc0909/competitor-intel-skill.git
 
 **Expected:** `Installed to …/.claude/skills/competitor-intel`.
 
+### Stop the permission prompts
+
+A run makes dozens of web searches and page fetches. By default Claude Code asks before each new tool, and WebFetch asks again for each new site. The skill declares the tools it needs (`allowed-tools` in SKILL.md), but some hosts don't apply that, so add the rules to your user settings too. In `~/.claude/settings.json`, merge these into any existing `permissions` block:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Bash(python3 */competitor-intel/scripts/intel.py *)"
+    ]
+  }
+}
+```
+
+Or tell Claude: *"Allow WebSearch, WebFetch and the competitor-intel script in my user settings."*
+
+- [ ] A run finishes without asking you to approve searches, fetches, or `intel.py` commands.
+
+You need these rules for scheduled runs. Nobody is there to click Allow, so without them a run stalls on its first search. They apply to every session, so Claude can fetch any URL without asking. To limit that to one project, put them in that project's `.claude/settings.json` instead.
+
 ## 2. Offline smoke test (about 1 minute, no web searches)
 
 This exercises the helper script end to end against a made-up company. Run it from a clone of the repo. If you installed with Option A, clone the repo too, just for this step.

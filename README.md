@@ -37,6 +37,8 @@ git clone https://github.com/markc0909/competitor-intel-skill.git && ./competito
 
 Requirements: Python 3.9+ (stdlib only), plus a web search tool in Claude.
 
+To stop Claude Code asking before every search and fetch, and for scheduled runs to work at all, allow the skill's tools in your settings. See [Stop the permission prompts](TESTING.md#stop-the-permission-prompts).
+
 **Testing it for the first time?** Follow [TESTING.md](TESTING.md): an offline smoke test, a live test in Claude, and an optional scheduling check, each with what to expect.
 
 ## Quick start

@@ -2,6 +2,7 @@
 name: competitor-intel
 description: Monitor competitors from a plain-Markdown watchlist and produce a cited, deduplicated intelligence digest (Markdown, HTML, chat text). Use when the user asks to run, schedule, or set up a competitor watch or competitor news briefing; asks "what are our competitors up to"; wants to add, remove, pause or change competitors, products, or search terms being monitored; wants to review suggested watchlist changes; or when a scheduled competitor-intel task fires.
 license: MIT
+allowed-tools: WebSearch, WebFetch, Bash(python3 */competitor-intel/scripts/intel.py *)
 metadata:
   version: 1.0.0
   tags: [competitors, market-intelligence, news, monitoring, digest]
