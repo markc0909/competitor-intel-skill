@@ -417,7 +417,7 @@ def plan_window(cfg: dict, state: dict, now: dt.datetime) -> dict:
         cut = state["cutoffs"].get(key)
         since = parse_time(cut) - overlap if cut else default_since
         out[key] = iso(since)
-    return {"until": iso(now), "since_by_watch": out}
+    return {"since": min(out.values(), default=iso(default_since)), "until": iso(now), "since_by_watch": out}
 
 
 # ---------------------------------------------------------------- normalisation
